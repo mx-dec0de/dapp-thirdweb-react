@@ -9,6 +9,7 @@ import { appConfig } from '../app.config';
 const queryClient = new QueryClient();
 
 export default function HomePage() {
+  alert (appConfig.envCheck)
   return (
     <QueryClientProvider client={queryClient}>
       <ThirdwebProvider activeChain={appConfig.network} supportedChains={[appConfig.network]} clientId={appConfig.thirdWebClientId}>
