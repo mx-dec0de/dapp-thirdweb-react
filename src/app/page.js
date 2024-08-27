@@ -2,13 +2,11 @@
 
 import React, { useState, useEffect } from 'react';
 import { ThirdwebProvider, ConnectWallet, useAddress, useDisconnect } from "@thirdweb-dev/react";
-
 import { QueryClient, QueryClientProvider } from 'react-query';
 import { ethers } from 'ethers';
 import { appConfig } from '../app.config';
 
 const queryClient = new QueryClient();
-
 
 export default function HomePage() {
   return (
@@ -17,26 +15,28 @@ export default function HomePage() {
         <WalletApp />
       </ThirdwebProvider>
     </QueryClientProvider>
-  );
+  ); 
 }
 
 async function switchToNetwork() {
   try {
-
-    await window.ethereum.request({
-      method: 'wallet_switchEthereumChain',
-      params: [{ chainId: appConfig.chainIdHexCode }],
-    })
-    console.log("Switched to " + appConfig.network.chainName)
+    if (typeof window.ethereum !== 'undefined') {
+      await window.ethereum.request({
+        method: 'wallet_switchEthereumChain',
+        params: [{ chainId: appConfig.chainIdHexCode }],
+      });
+      console.log("Switched to " + appConfig.network.chainName);
+    } else {
+      throw new Error("Ethereum provider not found");
+    }
   } catch (switchError) {
-
     if (switchError.code === 4902) {
       try {
         await window.ethereum.request({
           method: 'wallet_addEthereumChain',
-          params: [appConfig.network]
+          params: [appConfig.network],
         });
-        console.log(appConfig.network.chainName +" added and switched");
+        console.log(appConfig.network.chainName + " added and switched");
       } catch (addError) {
         console.error("Failed to add the network", addError);
       }
@@ -45,7 +45,6 @@ async function switchToNetwork() {
     }
   }
 }
-
 
 function WalletApp() {
   const [gasBalance, setGasBalance] = useState(null);
@@ -59,10 +58,22 @@ function WalletApp() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (address) {
-      setLoading(true); // Начало загрузки
-      switchToNetwork().then(fetchBalances).finally(() => setLoading(false));
-    }
+    const handleNetworkSwitchAndFetch = async () => {
+      if (address) {
+        try {
+          setLoading(true);
+          await switchToNetwork();
+          await fetchBalances();
+        } catch (err) {
+          console.error("Error during network switch or balance fetching:", err);
+          setError(`Error: ${err.message}`);
+        } finally {
+          setLoading(false);
+        }
+      }
+    };
+
+    handleNetworkSwitchAndFetch();
   }, [address]);
 
   const fetchBalances = async () => {
@@ -79,12 +90,9 @@ function WalletApp() {
       const balance = await provider.getBalance(address);
       setGasBalance(ethers.utils.formatEther(balance));
 
-
       const uoaContract = new ethers.Contract(appConfig.unitOfAccount.contract, appConfig.unitOfAccount.ABI, provider);
-      console.log(`Calling balanceOf for address: ${address} on contract ${appConfig.unitOfAccount.contract} on network ${appConfig.network.chainId}`);
-
       const uoaBalanceRaw = await uoaContract.balanceOf(address);
-      setUoaBalance(ethers.utils.formatUnits(uoaBalanceRaw, appConfig.unitOfAccount.decimals)); 
+      setUoaBalance(ethers.utils.formatUnits(uoaBalanceRaw, appConfig.unitOfAccount.decimals));
     } catch (err) {
       console.error("Error fetching balances:", err);
       setError(`Error fetching balances: ${err.message}`);
@@ -96,11 +104,11 @@ function WalletApp() {
       setError(null);
       const provider = new ethers.providers.Web3Provider(window.ethereum);
       const signer = provider.getSigner();
-      
+
       const uoaContract = new ethers.Contract(appConfig.unitOfAccount.contract, appConfig.unitOfAccount.ABI, signer);
-      const tx = await uoaContract.transfer(recipientAddress, ethers.utils.parseUnits(amountToSend, 6));
+      const tx = await uoaContract.transfer(recipientAddress, ethers.utils.parseUnits(amountToSend, appConfig.unitOfAccount.decimals));
       await tx.wait();
-      fetchBalances(); 
+      await fetchBalances();
       alert("Transaction successful!");
     } catch (err) {
       console.error("Transaction failed:", err);
@@ -126,20 +134,26 @@ function WalletApp() {
           )}
           {address && (
             <>
-              <p>Your {userNetwork ? userNetwork.name : 'Network'} Address:{address}</p>
-              <p>${appConfig.network.nativeCurrency.name} Balance: {gasBalance !== null ? `${gasBalance} ${appConfig.network.nativeCurrency.name}` : "Loading..."}</p>
-              <p>${appConfig.unitOfAccount.name} Balance: {uoaBalance !== null ? `${uoaBalance} ${appConfig.unitOfAccount.name}` : "Loading..."}</p>
+              {!loading ? (
+                <>
+                  <p>Your {userNetwork ? userNetwork.name : 'Network'} Address: {address}</p>
+                  <p>{appConfig.network.nativeCurrency.name} Balance: {gasBalance !== null ? `${gasBalance} ${appConfig.network.nativeCurrency.name}` : "Loading..."}</p>
+                  <p>{appConfig.unitOfAccount.name} Balance: {uoaBalance !== null ? `${uoaBalance} ${appConfig.unitOfAccount.name}` : "Loading..."}</p>
+                </>
+              ) : (
+                <p>Loading balances...</p>
+              )}
 
               <div>
                 <h2>Send {appConfig.unitOfAccount.name}</h2>
                 <div className="field">
                   <label className="label">Recipient Address</label>
                   <div className="control">
-                    <input 
-                      className="input" 
-                      type="text" 
-                      placeholder="Recipient Address" 
-                      value={recipientAddress} 
+                    <input
+                      className="input"
+                      type="text"
+                      placeholder="Recipient Address"
+                      value={recipientAddress}
                       onChange={(e) => setRecipientAddress(e.target.value)}
                     />
                   </div>
@@ -147,9 +161,9 @@ function WalletApp() {
                 <div className="field">
                   <label className="label">{`Amount ${appConfig.unitOfAccount.name}`}</label>
                   <div className="control">
-                    <input 
-                      className="input" 
-                      type="text" 
+                    <input
+                      className="input"
+                      type="text"
                       placeholder={`Amount ${appConfig.unitOfAccount.name}`}
                       value={amountToSend}
                       onChange={(e) => setAmountToSend(e.target.value)}
@@ -157,15 +171,13 @@ function WalletApp() {
                   </div>
                 </div>
                 <button className="button is-primary" onClick={handleSendTransaction}>
-                  Send ${appConfig.unitOfAccount.name}
+                  Send {appConfig.unitOfAccount.name}
                 </button>
               </div>
             </>
           )}
 
           {error && <p className="has-text-danger">{error}</p>}
-
-          
         </div>
       </div>
     </section>

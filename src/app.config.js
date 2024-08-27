@@ -17,4 +17,8 @@ export const appConfig = {
   network: Polygon, 
   chainIdHexCode: '0x89',
   thirdWebClientId: process.env.NEXT_PUBLIC_THIRD_WEB_CLIENTID
+<<<<<<< HEAD
 };
+=======
+};
+>>>>>>> 32f729d (fix provider)
