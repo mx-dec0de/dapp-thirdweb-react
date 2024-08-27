@@ -16,7 +16,7 @@ export const appConfig = {
   unitOfAccount: UNIT_OF_ACCOUNT,
   network: Polygon, 
   chainIdHexCode: '0x89',
-  thirdWebClientId: process.env.NEXT_PUBLIC_THIRD_WEB_CLIENTID
+  thirdWebClientId: process.env.NEXT_PUBLIC_THIRD_WEB_CLIENTID 
 <<<<<<< HEAD
 };
 =======
